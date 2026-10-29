@@ -1,135 +1,160 @@
-# FengGe-Desktop-Pet 技术文档
+# GoodThing Pet — Technical Documentation
 
-只想装上玩的话看 [README](README.md)。这一份写给要自己编译、改代码、或者被派来装这个东西的 agent。
+If you only want to install and play, read the [README](README.md). This document is for anyone building from source, changing the code, or deploying the app for someone else.
 
 ---
 
-好事桌宠是一个运行在 macOS 桌面上的人物挂件。它使用博主峰哥亡命天涯作为形象，以及从两份峰哥语录的 MP3 中切出的 11 句原声。点击人物就能随机听一句“这是个好事儿啊”。
+GoodThing Pet is a character accessory that lives on the macOS desktop. It uses the likeness of the Chinese creator FengGe (峰哥亡命天涯) and 11 voice clips cut from two MP3 recordings of his remarks. Clicking the character plays a random line.
 
-## 项目解决什么问题
+## What problem this solves
 
-想把喜欢的人物和语音放在桌面上随时互动时，反复打开录音并寻找某一句话很麻烦。这个应用把连续录音拆成短句，点击桌面人物即可播放，并提供简单的播放和外观设置。
+If you want a favorite character and its voice on your desktop for quick interaction, opening a recording and hunting for a particular sentence is tedious. This app cuts a continuous recording into short clips, plays one when you click the desktop character, and provides simple playback and appearance settings.
 
-## 主要功能
+## Main features
 
-- **透明悬浮人物**：人物显示在普通窗口前方，不占用 Dock 图标；菜单栏显示“好事”。
-- **随机播放**：点击人物播放 11 句中的一句。一轮内不重复，下一轮的第一句也不会紧接着重复上一句。
-- **连续点击切换**：再次点击会停止当前语音，再播放下一句，声音不会叠加。
-- **说话动画和字幕**：播放时人物沿竖直方向压缩、回弹，宽度不变；字幕显示当前语句。系统开启“减少动态效果”时，人物保持静止。
-- **拖动与设置**：拖动人物可以换位置；右键人物或点击菜单栏“好事”，可以挑选指定语句、停止播放、调整音量和人物大小、移回屏幕右下角或退出。位置、音量和大小会被记住。
-- **和另外两个桌宠搭伴**：桌面上同时跑着 [SunPet](https://github.com/Ganzhe2028/SunPet) 或[薄肌桌宠](https://github.com/Ganzhe2028/ShaolanPet) 时，峰哥说完一句，那边自动接一句短的，凑成一段捧哏。见[三个桌宠](#三个桌宠)。
+- **Transparent floating character.** The character is drawn in front of normal windows, without a Dock icon. A `GoodThing` item appears in the menu bar.
+- **Random playback.** Clicking the character plays one of 11 clips. No clip repeats within a cycle, and the first clip of the next cycle does not immediately repeat the previous clip.
+- **Click to switch.** Clicking again stops the current clip and starts the next one; audio never overlaps.
+- **Talking animation and captions.** While a clip plays, the character compresses vertically and springs back without changing width, and a caption shows the current line. When macOS Reduce Motion is enabled, the character stays still.
+- **Dragging and settings.** Drag the character to move it. Right-click it, or click `GoodThing` in the menu bar, to choose a specific clip, stop playback, adjust volume and character size, move the pet back to the bottom-right corner, or quit. Position, volume and size are persisted.
+- **Companion mode.** If [SunPet](https://github.com/Ganzhe2028/SunPet) or [ShaolanPet](https://github.com/Ganzhe2028/ShaolanPet) is running on the same desktop, GoodThing replies after a qualifying line from another pet, forming a short comedy exchange. See [The three pets](#the-three-pets).
 
-## 安装方法
+## Installation
 
-需要 **Apple Silicon Mac** 和 **macOS 14 或更新版本**。运行应用本身不需要 Python、语音识别模型或网络连接。
+Requires an **Apple Silicon Mac** and **macOS 14 or newer**. Running the app needs no Python, speech-recognition model or network connection.
 
-### 方式一：下载安装包（推荐）
+### Option 1: Download a release (recommended)
 
-仓库不存放二进制文件，安装包在 [Releases](https://github.com/Ganzhe2028/FengGe-Desktop-Pet/releases) 页面。
+The repository does not store binaries. Releases are on the [Releases](https://github.com/XenoChrome370/Desktop-Pet/releases) page.
 
-1. 下载最新的 `GoodThingPet-x.y.dmg`，双击打开。
-2. 把「好事桌宠.app」拖进「应用程序」文件夹。
-3. 在「应用程序」里打开。应用使用本地签名、未经过 Apple 公证，首次打开会被 Gatekeeper 拦下：右键应用选「打开」，或在「系统设置 › 隐私与安全性」里点「仍要打开」。
+1. Download the latest `GoodThingPet-x.y.dmg` and open it.
+2. Drag `GoodThingPet.app` into the **Applications** folder.
+3. Open it from Applications. The app uses an ad-hoc signature and is not notarized by Apple, so Gatekeeper blocks the first launch: right-click the app and choose **Open**, or go to **System Settings › Privacy & Security** and click **Open Anyway**.
 
-也可以下载 zip，但**要用 Finder 双击解压**。终端 `unzip` 处理 UTF-8 中文文件名会报 `write error (disk full?)` 并漏掉文件，这是 Info-ZIP 的老问题，不是包坏了。
+You can also download the zip, but **extract it by double-clicking in Finder**. Terminal `unzip` mishandles non-ASCII Chinese filenames, reports `write error (disk full?)` and silently drops files. This is a long-standing Info-ZIP problem, not a corrupt archive.
 
-### 方式二：从源码构建
+### Option 2: Build from source
 
-需要 Xcode Command Line Tools 提供 `swiftc`，安装命令 `xcode-select --install`。在项目根目录运行：
+Requires `swiftc` from the Xcode Command Line Tools; install with `xcode-select --install`. From the project root:
 
 ```sh
-./build.sh          # 编译并在终端跑一遍自检，成功时最后一行输出 PASS
-./install.sh        # 装进「应用程序」、去掉隔离标记并启动
+./build.sh          # compile and run the self-test; prints PASS on success
+./install.sh        # install into Applications, clear quarantine, and launch
 ```
 
-构建产物位于 `build/好事桌宠.app`，也可以手动拖进「应用程序」。要分发给别人时用 `./build.sh --package`，它会在 `dist/` 下产出 zip、dmg 和 sha256 校验文件。卸载运行 `./install.sh --uninstall`（位置、音量等设置会保留）。
+The build output is `build/GoodThingPet.app`; you can also drag it into Applications manually. To distribute it to others, run `./build.sh --package`, which produces a zip, a dmg and a sha256 checksum file under `dist/`. To uninstall, run `./install.sh --uninstall` (position, volume and other settings are kept).
 
-## 使用方法
+### Option 3: Build with Xcode
 
-| 操作 | 结果 |
+Open `GoodThingPet.xcodeproj`, choose the `GoodThingPet` scheme, and run. The shared scheme is checked in, so a fresh clone needs no scheme setup. The project uses:
+
+- product name `GoodThingPet`, bundle identifier `local.goodthing.desktop-pet`
+- deployment target macOS 14.0, architecture `arm64`
+- Swift language mode 5.0
+- ad-hoc signing (`CODE_SIGN_IDENTITY = "-"`)
+- `LSUIElement` enabled through `Xcode/Info.plist`
+- the same resources as `build.sh`: `Assets/clips.json`, `Assets/face.png`, `Assets/AppIcon.icns`, and `Assets/Clips` copied as a folder
+
+Build from the command line:
+
+```sh
+xcodebuild -project GoodThingPet.xcodeproj -scheme GoodThingPet -configuration Release build
+```
+
+The Xcode build is an alternative to `build.sh`, not a replacement. `build.sh` is still the canonical path for release packaging and for the `--self-test` check.
+
+## Usage
+
+| Action | Result |
 | --- | --- |
-| 单击人物 | 随机播放一句，同时显示字幕和竖直压缩动画 |
-| 在播放中再次单击 | 停止上一句，播放下一句 |
-| 拖动人物 | 移动悬浮窗；退出后记住位置 |
-| 右键人物或点击菜单栏“好事” | 打开设置菜单 |
-| 菜单中选择“挑一句” | 立即播放选中的语句 |
-| 菜单中选择“停止播放” | 停止声音，并隐藏字幕、结束动画 |
-| 菜单中选择“退出桌宠” | 退出应用 |
+| Single-click the character | Play a random clip, show its caption and start the vertical compression animation |
+| Click again during playback | Stop the current clip and play the next one |
+| Drag the character | Move the floating window; the position is remembered after quitting |
+| Right-click the character or click `GoodThing` in the menu bar | Open the settings menu |
+| Menu → **Choose a clip** | Play the selected clip immediately |
+| Menu → **Stop playback** | Stop the audio, hide the caption and end the animation |
+| Menu → **Quit pet** | Quit the app |
 
-### 三个桌宠
+### The three pets
 
-第四个是 [果冻桌宠](https://github.com/aurelius358/JellyPet)：形状挂件，没有语音，也不在 `Bridge.swift` 这套协议里，所以不接话。
+The fourth pet, [JellyPet](https://github.com/aurelius358/JellyPet), is a shape accessory with no voice. It is not part of the `Bridge.swift` protocol and does not reply.
 
-这一组桌宠共用一套联动协议，同时跑起来会自己接话：
-
-```
-薄肌 ──> 太对了 ──> 峰哥 ──> 太对了
-```
-
-| 桌宠 | 说什么 | 在联动里的位置 |
-| --- | --- | --- |
-| [好事桌宠](https://github.com/Ganzhe2028/FengGe-Desktop-Pet) | 峰哥 · 11 句「这是个好事」 | 接太对了的话，但只在薄肌起的链里 |
-| [太对了 · SunPet](https://github.com/Ganzhe2028/SunPet) | 孙宇晨 · 28 句「太对了」 | 谁说话都接 |
-| [薄肌桌宠](https://github.com/Ganzhe2028/ShaolanPet) | 邵艾伦 · 37 句 | 起头，自己不接 |
-
-点薄肌起头会一路接下去：太对了 → 峰哥 → 太对了，四句一串，到第四句停。点峰哥只有太对了接一句就停。点太对了没人接。
-
-峰哥和薄肌之间没有直接通道。太对了接完峰哥链就断了，不会无限往下接 —— 靠通知里带的跳数封顶，不靠谁记得「别接」。
-
-桌面上同时跑着 [SunPet](https://github.com/Ganzhe2028/SunPet)（菜单栏那个「太对了」）或者[薄肌桌宠](https://github.com/Ganzhe2028/ShaolanPet)的时候，会自己接上：你点峰哥说完一句，那边接一句一秒以内的短应答，凑成一段捧哏。
-
-- **两边都在跑才起作用**，不用配对、不开端口、不联网。太对了退出后自动停，菜单栏「好事」里能看到「联动：接太对了」变成只剩自己。
-- **叠着接**：那边在峰哥这句还剩 0.3 秒左右就进场，不是为了抢话，是等说完再开口中间会空一截，听着像卡了一下。第二跳（太对了接完轮到峰哥）压到 0.2 秒，四步连起来才不拖。
-- **峰哥只在薄肌起的链里接话**：你自己点峰哥，只有太对了接一句就停，不会把峰哥自己再带出来一次。太对了没打招呼就退出，也只是这一捧没人接，不影响峰哥正常播放。
-
-实现上是三个应用通过 `DistributedNotificationCenter` 传一条本机通知，对方在不在跑用 bundle id 查 `NSRunningApplication`，不靠「发一条看有没有人回」来猜。协议和存活检测都在 `Sources/Bridge.swift`，三个仓库各放一份内容完全相同的副本，改动要同步。
-
-## 常见问题
-
-| 现象 | 原因和处理 |
-| --- | --- |
-| 双击应用没反应，Dock 里也没出现 | 已经有一个实例在跑。同一个应用只允许运行一个，第二次启动会静默退出。看菜单栏最右侧的「好事」。 |
-| 提示「已损坏，应移至废纸篓」或「无法验证开发者」 | 应用是本地签名、未经 Apple 公证，被 Gatekeeper 拦下。右键应用选「打开」，或在「系统设置 › 隐私与安全性」里点「仍要打开」。仍不行时在终端运行 `xattr -dr com.apple.quarantine /Applications/好事桌宠.app`。 |
-| 解压时提示 `write error (disk full?)`，文件少了一批 | 终端 `unzip` 处理中文文件名的老问题，磁盘其实没满。改用 Finder 双击解压，或 `ditto -x -k 包名.zip 目标目录`。 |
-| 点人物没有声音 | 菜单栏「好事」→「音量」检查是否静音，同时确认系统输出设备和音量。 |
-| 人物被拖到屏幕外，或换了显示器后找不回来 | 菜单栏「好事」→「移回屏幕右下角」。 |
-| 覆盖安装后打开还是旧版本 | 旧进程还在跑。`./install.sh` 会先退出旧进程再装。 |
-
-## 输入与输出示例
-
-这是桌面应用，没有命令行文字输入。它的输入是鼠标操作，输出是人物动画、字幕和声音。例如：
+The three pets share one companion protocol and talk to each other when running together:
 
 ```text
-输入：右键人物 → 挑一句 → 11 人有欲望是好事
-输出：播放第 11 句原声；显示“人有欲望是好事”字幕；人物沿竖直方向压缩、回弹。
-
-输入：播放时再次单击人物
-输出：停止当前语音；从随机队列取出下一句并播放，不会同时发出两句声音。
+Shaolan ──> SunPet ──> FengGe ──> SunPet
 ```
 
-菜单中的音量、人物大小，以及拖动后的窗口位置会保存在 macOS 用户设置中。
+| Pet | Says | Role in the chain |
+| --- | --- | --- |
+| [GoodThing Pet](https://github.com/XenoChrome370/Desktop-Pet) | FengGe · 11 "this is a good thing" clips | Answers SunPet, but only in a chain started by Shaolan |
+| [SunPet](https://github.com/Ganzhe2028/SunPet) | Sun Yuchen · 28 "too right" clips | Answers anyone |
+| [ShaolanPet](https://github.com/Ganzhe2028/ShaolanPet) | Shao Ailun · 37 clips | Starts the chain; never answers |
 
-## 项目文件
+Clicking Shaolan starts a chain that runs to the end: SunPet → FengGe → SunPet, four lines total, stopping at the fourth. Clicking FengGe gets one reply from SunPet and then stops. Clicking SunPet gets no reply.
 
-| 路径 | 用途 |
+There is no direct channel between FengGe and Shaolan. Once SunPet finishes the FengGe chain, the chain is over; it cannot continue indefinitely. The cap is a hop count carried in each notification, not a rule each pet has to remember.
+
+When [SunPet](https://github.com/Ganzhe2028/SunPet) (the `SunPet` menu bar item) or [ShaolanPet](https://github.com/Ganzhe2028/ShaolanPet) is also running, GoodThing joins in automatically: after you click FengGe and the line finishes, the other pet answers with a short reply under one second, forming a comedy exchange.
+
+- **Both apps must be running.** No pairing, ports or network are involved. If SunPet quits, companion mode stops automatically; the `GoodThing` menu item changes from `Link: listening to SunPet` to a self-only state.
+- **Overlapping handoff.** The other pet starts roughly 0.3 seconds before the current line ends. This is not meant to interrupt; waiting until the line fully ends leaves an audible gap that sounds like a glitch. The second hop (SunPet replying after FengGe) is tightened to 0.2 seconds so the four steps do not drag.
+- **FengGe replies only in a chain started by Shaolan.** If you click FengGe yourself, only SunPet answers once and stops; FengGe is not brought back for another line. If SunPet quits without notice, only this exchange is lost; normal FengGe playback is unaffected.
+
+Implementation: the three apps send a local notification through `DistributedNotificationCenter`. Whether a peer is running is checked with `NSRunningApplication` by bundle identifier, not by "send a message and see if anyone answers". The protocol and liveness checks live in `Sources/Bridge.swift`; each of the three repositories holds an identical copy, so changes must be synchronized.
+
+## FAQ
+
+| Symptom | Cause and fix |
 | --- | --- |
-| `Sources/main.swift` | 透明窗口、鼠标操作、随机播放、动画、菜单、设置和自检 |
-| `Sources/Bridge.swift` | 和 SunPet 的捧哏联动通道：通知协议、对方存活检测。两边仓库同一份 |
-| `Assets/face.png` | 透明背景的人物图片 |
-| `Assets/Clips/` | 11 条切好的 WAV 音频 |
-| `Assets/clips.json` | 每条音频的编号、文字标签、文件名和时长 |
-| `Work/cuts.json`、`Work/audio-cut-notes.md` | 原始录音与各句裁剪时间的对应关系 |
-| `build.sh` | 环境检查、编译、打包素材、本地签名、自检，`--package` 时产出分发包 |
-| `install.sh` | 装进「应用程序」、去掉下载隔离标记、启动；`--uninstall` 卸载 |
-| `.github/workflows/release.yml` | 打 `v*` 标签时自动构建并发布 zip、dmg 和校验文件 |
+| Double-clicking the app does nothing and no Dock icon appears | An instance is already running. Only one copy of the app may run; a second launch exits silently. Look for the `GoodThing` item at the right end of the menu bar. |
+| "App is damaged and should be moved to the Trash" or "unidentified developer" | The app is ad-hoc signed and not notarized, so Gatekeeper blocks it. Right-click the app and choose **Open**, or go to **System Settings › Privacy & Security** and click **Open Anyway**. If that fails, run `xattr -dr com.apple.quarantine /Applications/GoodThingPet.app` in Terminal. |
+| Extraction reports `write error (disk full?)` and files are missing | A known problem with terminal `unzip` and non-ASCII filenames; the disk is not actually full. Extract by double-clicking in Finder, or use `ditto -x -k archive.zip destination`. |
+| No sound when clicking the character | Check **Volume** in the `GoodThing` menu and confirm the system output device and volume. |
+| The character was dragged off-screen, or is lost after changing displays | Menu → **Move back to bottom-right**. |
+| The old version still opens after reinstalling | The old process is still running. `./install.sh` quits it before installing. |
 
-本项目的代码和文档采用根目录 `LICENSE` 中的 MIT 许可。初版来自 [yuhanfu513-ops/FengGe-Desktop-Pet](https://github.com/yuhanfu513-ops/FengGe-Desktop-Pet)，本仓库在此基础上继续开发。交互和播放设计参考了 SunPet，其原作者的 MIT 许可保留在 [`licenses/SunPet-MIT.txt`](licenses/SunPet-MIT.txt) 中。人物图片和声音素材不属于这些代码许可范围。
+## Input and output examples
 
-## 加第四个人
+This is a desktop app with no command-line text input. Its input is mouse interaction; its output is animation, captions and audio. For example:
 
-三个仓库是同一份代码的复制品，加角色就是复制这个模式：
+```text
+Input:  right-click the character → Choose a clip → 11 人有欲望是好事
+Output: play the 11th original clip; show the caption “人有欲望是好事”;
+        compress the character vertically and spring it back.
 
-1. `Sources/Bridge.swift` 的 `PetRole` 枚举加一个 case，值是新角色的 bundle id，`displayName` 里补中文名。
-2. `peers` 表决定「我听谁」。现在三份是各自硬编码的：想让它接谁的话，就把谁加进去；只说不接的角色 peers 留空。
-3. `Bridge.swift` 三个仓库逐字节相同（md5 一致），改一处就要三处同步，否则联动会半通。
-4. 新仓库直接复制任意一个，换掉 `Assets/` 里的音频、`clips.json`、`face.png` 和 bundle id，`./build.sh --package` 出安装包。
+Input:  click the character again during playback
+Output: stop the current audio; take the next clip from the random queue and play it;
+        two clips never sound at the same time.
+```
+
+Volume, character size and the window position after dragging are stored in macOS user defaults.
+
+## Project files
+
+| Path | Purpose |
+| --- | --- |
+| `Sources/main.swift` | Transparent window, mouse handling, random playback, animation, menus, settings and self-test |
+| `Sources/Bridge.swift` | Companion channel with SunPet: notification protocol and peer liveness checks. Identical in both repositories |
+| `Assets/face.png` | Character image with a transparent background |
+| `Assets/Clips/` | 11 cropped WAV audio files |
+| `Assets/clips.json` | Clip ID, text label, filename and duration for each audio file |
+| `Work/cuts.json`, `Work/audio-cut-notes.md` | Mapping between the source recordings and each clip's cut points |
+| `GoodThingPet.xcodeproj` | Native Xcode project and shared `GoodThingPet` scheme |
+| `Xcode/Info.plist` | Bundle identifier, version, `LSUIElement` and other bundle settings used by Xcode |
+| `build.sh` | Environment checks, compile, resource bundling, ad-hoc signing, self-test; `--package` produces distributables |
+| `install.sh` | Install into Applications, clear the download quarantine flag, launch; `--uninstall` removes the app |
+| `.github/workflows/release.yml` | Builds and publishes zip, dmg and checksums when a `v*` tag is pushed |
+
+The code and documentation in this project are MIT licensed under the root `LICENSE`. The original version came from [yuhanfu513-ops/FengGe-Desktop-Pet](https://github.com/yuhanfu513-ops/FengGe-Desktop-Pet); this repository continues from it. The interaction and playback design was inspired by SunPet, whose original author's MIT license is preserved in [`licenses/SunPet-MIT.txt`](licenses/SunPet-MIT.txt). The character image and voice clips are outside these code licenses.
+
+## Adding a fourth character
+
+The three repositories are copies of the same code. Adding a character means repeating the pattern:
+
+1. Add a case to the `PetRole` enum in `Sources/Bridge.swift`, with the new bundle identifier as its value, and add a display name.
+2. The `peers` list decides "who I listen to". Each of the three copies hard-codes its own list: add the characters it should answer; leave `peers` empty for a character that only speaks and never answers.
+3. `Sources/Bridge.swift` must be byte-identical across all three repositories (`md5` must match). Changing one copy requires syncing all three, otherwise the companion chain works only halfway.
+4. For a new repository, copy any existing one, replace the audio in `Assets/`, `clips.json`, `face.png` and the bundle identifier, then run `./build.sh --package` to produce an installer.
+
+Do not edit `Sources/Bridge.swift` in only one repository. The shared file is the protocol; the per-pet configuration is `me` and `peers` at the call site in `main.swift`.

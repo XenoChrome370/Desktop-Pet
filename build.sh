@@ -1,15 +1,16 @@
 #!/bin/bash
-# 构建好事桌宠：环境检查 → 编译 → 打包资源 → 本地签名 → 自检 →（可选）产出可分发文件
+# Build GoodThing Pet: environment checks → compile → bundle resources → ad-hoc sign → self-test → (optional) distributables
 #
-#   ./build.sh                 编译并自检，产物在 build/好事桌宠.app
-#   ./build.sh --package       另外产出 dist/ 下的 zip、dmg 和 sha256 校验文件
-#   ./build.sh --no-self-test  跳过自检（没有图形会话的环境里用）
+#   ./build.sh                 compile and self-test; output in build/GoodThingPet.app
+#   ./build.sh --package       also produce zip, dmg and sha256 checksums in dist/
+#   ./build.sh --no-self-test  skip the self-test (for environments without a GUI session)
 #
-# 环境变量：PET_VERSION（默认 1.1）、PET_BUILD（默认 2）
+# Environment: PET_VERSION (default 1.1), PET_BUILD (default 2)
 set -euo pipefail
 cd "$(dirname "$0")"
 
-APP_NAME="好事桌宠"
+APP_NAME="GoodThingPet"
+DISPLAY_NAME="GoodThing Pet"
 EXECUTABLE="GoodThingPet"
 BUNDLE_ID="local.goodthing.desktop-pet"
 VERSION="${PET_VERSION:-1.1}"
@@ -25,45 +26,46 @@ for arg in "$@"; do
         --package) PACKAGE=1 ;;
         --no-self-test) SELF_TEST=0 ;;
         -h|--help) sed -n '2,9p' "$0"; exit 0 ;;
-        *) printf '未知参数：%s（可用：--package / --no-self-test / --help）\n' "$arg" >&2; exit 2 ;;
+        *) printf 'Unknown argument: %s (available: --package / --no-self-test / --help)\n' "$arg" >&2; exit 2 ;;
     esac
 done
 
-die() { printf '\n构建中止：%s\n' "$1" >&2; exit 1; }
+die() { printf '\nBuild aborted: %s\n' "$1" >&2; exit 1; }
 
 check_environment() {
-    [ "$(uname -s)" = "Darwin" ] || die "只能在 macOS 上构建，当前系统是 $(uname -s)。"
+    [ "$(uname -s)" = "Darwin" ] || die "This project builds on macOS only; current system is $(uname -s)."
     local arch
     arch="$(uname -m)"
     if [ "$arch" != "arm64" ]; then
-        die "本项目只支持 Apple Silicon（arm64），当前是 $arch。Intel Mac 需把 DEPLOY_TARGET 改成 x86_64-apple-macosx14.0 后自行验证。"
+        die "This project supports Apple Silicon (arm64) only; current architecture is $arch. On an Intel Mac, change DEPLOY_TARGET to x86_64-apple-macosx14.0 and verify the build yourself."
     fi
     local os_major
     os_major="$(sw_vers -productVersion | cut -d. -f1)"
     if [ "$os_major" -lt 14 ]; then
-        die "需要 macOS 14 或更新版本，当前是 $(sw_vers -productVersion)。"
+        die "macOS 14 or newer is required; current version is $(sw_vers -productVersion)."
     fi
     if ! command -v swiftc >/dev/null 2>&1; then
-        die "找不到 swiftc。先安装 Xcode Command Line Tools：
+        die "swiftc not found. Install the Xcode Command Line Tools first:
     xcode-select --install
-装完重新运行本脚本（不需要完整 Xcode）。"
+Then rerun this script (a full Xcode install is not required)."
     fi
 }
 
 compile() {
-    printf '编译中…\n'
+    printf 'Compiling…\n'
     rm -rf "$BUNDLE"
     mkdir -p "$BUNDLE/Contents/MacOS" "$BUNDLE/Contents/Resources"
     if ! swiftc -O -target "$DEPLOY_TARGET" -framework AppKit -framework AVFoundation \
         Sources/main.swift Sources/Bridge.swift -o "$BUNDLE/Contents/MacOS/$EXECUTABLE"; then
-        die "swiftc 编译失败。请把上面的完整报错贴到 issue：
-    https://github.com/yuhanfu513-ops/FengGe-Desktop-Pet/issues"
+        die "swiftc failed. Please paste the full error above into an issue:
+    https://github.com/XenoChrome370/Desktop-Pet/issues"
     fi
     if [ ! -f Assets/face.png ]; then
-        die "缺少 Assets/face.png，素材不完整。用 Finder 双击解压，别用终端 unzip（对中文文件名会报错并漏文件）。"
+        die "Assets/face.png is missing; the asset bundle is incomplete. Extract the archive with Finder, not terminal unzip (which mishandles non-ASCII filenames and drops files)."
     fi
     cp -R Assets/. "$BUNDLE/Contents/Resources/"
-    cp LICENSE LICENSE-SunPet "$BUNDLE/Contents/Resources/"
+    cp LICENSE "$BUNDLE/Contents/Resources/LICENSE"
+    cp licenses/SunPet-MIT.txt "$BUNDLE/Contents/Resources/LICENSE-SunPet"
     cat > "$BUNDLE/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -71,7 +73,7 @@ compile() {
 <key>CFBundleExecutable</key><string>$EXECUTABLE</string>
 <key>CFBundleIdentifier</key><string>$BUNDLE_ID</string>
 <key>CFBundleName</key><string>$APP_NAME</string>
-<key>CFBundleDisplayName</key><string>$APP_NAME</string>
+<key>CFBundleDisplayName</key><string>$DISPLAY_NAME</string>
 <key>CFBundlePackageType</key><string>APPL</string>
 <key>CFBundleShortVersionString</key><string>$VERSION</string>
 <key>CFBundleVersion</key><string>$BUILD_NUMBER</string>
@@ -81,36 +83,36 @@ compile() {
 <key>CFBundleIconFile</key><string>AppIcon</string>
 </dict></plist>
 PLIST
-    codesign --force --sign - "$BUNDLE" >/dev/null 2>&1 || die "本地签名失败。"
+    codesign --force --sign - "$BUNDLE" >/dev/null 2>&1 || die "Ad-hoc signing failed."
 }
 
 self_test() {
-    printf '自检中…\n'
+    printf 'Running self-test…\n'
     local out
     if ! out="$("$BUNDLE/Contents/MacOS/$EXECUTABLE" --self-test 2>&1)"; then
         printf '%s\n' "$out" >&2
-        die "自检未通过（上面每行 FAIL 都指向具体环节）。若报素材缺失，请重新完整下载素材。"
+        die "Self-test failed (each FAIL line above points to a specific check). If it reports missing assets, download the assets again in full."
     fi
     printf '%s\n' "$out" | tail -1
 }
 
 package() {
-    # 分发包用 ASCII 文件名：GitHub Release 会丢掉附件名里的非 ASCII 字符，
-    # 中文名上传后会变成「-1.1.dmg」这种残缺名字
+    # Use ASCII filenames for distributables: GitHub Releases strips non-ASCII
+    # characters from asset names, leaving truncated names such as "-1.1.dmg".
     local base="GoodThingPet-$VERSION"
     mkdir -p "$DIST"
     rm -f "$DIST/$base.zip" "$DIST/$base.dmg" "$DIST/$base.sha256"
-    # zip 用 ditto 生成：Finder 双击和 unzip 都能正确解出中文文件名
+    # Build the zip with ditto: both Finder and unzip then extract non-ASCII filenames correctly.
     ditto -c -k --keepParent "$BUNDLE" "$DIST/$base.zip"
     local stage
     stage="$(mktemp -d)"
     cp -R "$BUNDLE" "$stage/"
     ln -s /Applications "$stage/Applications"
-    hdiutil create -quiet -volname "$APP_NAME" -srcfolder "$stage" -ov -format UDZO \
-        "$DIST/$base.dmg" || die "生成 dmg 失败。"
+    hdiutil create -quiet -volname "$DISPLAY_NAME" -srcfolder "$stage" -ov -format UDZO \
+        "$DIST/$base.dmg" || die "Failed to create the dmg."
     rm -rf "$stage"
     ( cd "$DIST" && shasum -a 256 "$base.zip" "$base.dmg" > "$base.sha256" )
-    printf '分发包：\n'
+    printf 'Distributables:\n'
     ls -lh "$DIST" | sed 1d | sed 's/^/  /'
 }
 
@@ -118,5 +120,5 @@ check_environment
 compile
 if [ "$SELF_TEST" = "1" ]; then self_test; fi
 if [ "$PACKAGE" = "1" ]; then package; fi
-printf '完成：%s\n' "$BUNDLE"
-printf '安装：./install.sh（或把 app 拖进「应用程序」）\n'
+printf 'Done: %s\n' "$BUNDLE"
+printf 'Install: ./install.sh (or drag the app into Applications)\n'

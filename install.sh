@@ -1,42 +1,54 @@
 #!/bin/bash
-# 一键安装好事桌宠：编译（如需）→ 装进「应用程序」→ 去掉下载隔离标记 → 启动
+# One-step GoodThing Pet installer: build (if needed) → install to Applications → clear the quarantine flag → launch
 #
-#   ./install.sh                    编译（如需要）后安装并启动
-#   ./install.sh --from 路径.app     安装一个已有的应用包（比如从 dmg 拖到下载文件夹的那个）
-#   ./install.sh --build            强制重新编译再安装
-#   ./install.sh --uninstall        退出并删除「应用程序」里的应用（保留位置、音量等设置）
+#   ./install.sh                    build (if needed), install and launch
+#   ./install.sh --from path.app    install an existing app bundle (e.g. one dragged out of a dmg)
+#   ./install.sh --build            force a rebuild before installing
+#   ./install.sh --uninstall        quit and delete the app in Applications (keeps position, volume, etc.)
 set -euo pipefail
 cd "$(dirname "$0")"
 
-APP_NAME="好事桌宠"
+APP_NAME="GoodThingPet"
 EXECUTABLE="GoodThingPet"
 BUILD_APP="build/$APP_NAME.app"
 TARGET="/Applications/$APP_NAME.app"
 SOURCE=""
 FORCE_BUILD=0
 
-die() { printf '\n安装中止：%s\n' "$1" >&2; exit 1; }
+die() { printf '\nInstall aborted: %s\n' "$1" >&2; exit 1; }
 quit_running() { pkill -x "$EXECUTABLE" >/dev/null 2>&1 || true; }
+# The app was previously shipped as 好事桌宠.app. Remove that bundle so a
+# reinstall does not leave two copies in Applications.
+LEGACY_TARGET="/Applications/好事桌宠.app"
+remove_legacy() {
+    if [ -e "$LEGACY_TARGET" ]; then
+        rm -rf "$LEGACY_TARGET" || true
+        printf 'Removed legacy bundle: %s\n' "$LEGACY_TARGET"
+    fi
+}
 
 case "${1:-}" in
     --uninstall)
         quit_running
         if [ ! -e "$TARGET" ]; then
-            printf '「应用程序」里没有%s，无需卸载。\n' "$APP_NAME"; exit 0
+            printf '%s is not in Applications; nothing to uninstall.\n' "$APP_NAME"
+        else
+            rm -rf "$TARGET" || die "Failed to delete $TARGET; you may need: sudo ./install.sh --uninstall"
+            printf 'Uninstalled %s.\n' "$TARGET"
         fi
-        rm -rf "$TARGET" || die "删除 $TARGET 失败，可能需要：sudo ./install.sh --uninstall"
-        printf '已卸载 %s。位置、音量、大小等设置仍保留在用户偏好里。\n' "$TARGET"
+        remove_legacy
+        printf 'Position, volume and size settings are kept in your user defaults.\n'
         exit 0
         ;;
     --from)
         SOURCE="${2:-}"
         if [ -z "$SOURCE" ] || [ ! -d "$SOURCE" ]; then
-            die "用法：./install.sh --from /路径/好事桌宠.app"
+            die "Usage: ./install.sh --from /path/GoodThingPet.app"
         fi
         ;;
     --build) FORCE_BUILD=1 ;;
     "") ;;
-    *) printf '未知参数：%s（可用：--from 路径 / --build / --uninstall）\n' "$1" >&2; exit 2 ;;
+    *) printf 'Unknown argument: %s (available: --from path / --build / --uninstall)\n' "$1" >&2; exit 2 ;;
 esac
 
 if [ -n "$SOURCE" ]; then
@@ -47,14 +59,16 @@ else
 fi
 
 quit_running
+remove_legacy
 sleep 0.5
-# 覆盖安装：先删旧版，避免新旧签名混杂导致启动失败
+# Reinstall: remove the old copy first so mixed signatures cannot break launch
 if [ -e "$TARGET" ]; then rm -rf "$TARGET"; fi
-cp -R "$BUNDLE" "$TARGET" || die "写入 $TARGET 失败。需要管理员权限时改用：sudo ./install.sh"
-# 从浏览器、dmg 或网盘拿到的包会带 com.apple.quarantine，本地签名会被 Gatekeeper 拦住
+cp -R "$BUNDLE" "$TARGET" || die "Failed to write $TARGET. If admin rights are required, use: sudo ./install.sh"
+# Bundles downloaded from a browser, dmg or cloud storage carry com.apple.quarantine,
+# which makes Gatekeeper reject the ad-hoc signature
 before="$(xattr -p com.apple.quarantine "$TARGET" 2>/dev/null || true)"
 xattr -dr com.apple.quarantine "$TARGET" 2>/dev/null || true
-if [ -n "$before" ]; then printf '已移除下载隔离标记。\n'; fi
+if [ -n "$before" ]; then printf 'Cleared the download quarantine flag.\n'; fi
 open "$TARGET"
-printf '已安装并启动：%s\n' "$TARGET"
-printf '入口在菜单栏最右侧的「好事」，点桌面上的人物就播放。\n'
+printf 'Installed and launched: %s\n' "$TARGET"
+printf 'The menu bar item on the far right opens settings; click the pet on the desktop to play.\n'

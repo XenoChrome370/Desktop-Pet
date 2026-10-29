@@ -1,8 +1,8 @@
-# 音频切分记录
+# Audio cut log
 
-语句边界根据本地语音识别和录音停顿确定。原始 MP3 保存在 Work 中；应用仅包含切好的 WAV。音频已适当调整音量，并在安静的切口处添加 5 毫秒淡入淡出。
+Sentence boundaries were determined from local speech recognition and pauses in the recording. The original MP3 files are kept in `Work/`; the app ships only the cropped WAV files. Levels were adjusted and a 5 ms fade was added at each quiet edit boundary.
 
-| 编号 | 文字标签 | 原始录音 | 起点（秒） | 终点（秒） |
+| # | Transcript | Source recording | Start (s) | End (s) |
 | --- | --- | --- | ---: | ---: |
 | 01 | 这个是个好事 | 这是个好事(1).mp3 | 0.040 | 1.115 |
 | 02 | 这是个好事 | 这是个好事(1).mp3 | 1.115 | 2.030 |
@@ -16,5 +16,5 @@
 | 10 | 对你挺好的 | 10月22日 (1).mp3 | 2.065 | 3.000 |
 | 11 | 人有欲望是好事 | 10月22日 (1).mp3 | 3.300 | 4.700 |
 
-桌宠窗口、点击播放、拖动、停止播放及 100 轮随机播放规则的自检已通过。
-文字标签由语音识别整理，可在 Assets/clips.json 中修改；修改后重新构建即可。
+The self-test covering the pet window, click-to-play, dragging, stopping playback and 100 rounds of the random-play rule passes.
+Transcripts were produced by speech recognition and can be edited in `Assets/clips.json`; rebuild after changing them.

@@ -1,12 +1,12 @@
-# 素材与第三方许可
+# Assets and Third-Party Licenses
 
-## 音频和头像
+## Audio and character image
 
-`Assets/Clips/` 里的音频、`Assets/face.png` 的头像，都不在 MIT 许可范围内，版权归原权利人。这个项目只做学习交流和玩梗，不商用。权利人如果觉得不合适，开个 issue 会移除。
+The audio in `Assets/Clips/` and the character image `Assets/face.png` are **not** covered by the MIT license. Copyright remains with the respective rights holders. This project is for learning, sharing and fan use only, not for commercial use. If a rights holder objects, open an issue and the assets will be removed.
 
-- 音频：两份峰哥语录的 MP3 里切出的 11 句原声，裁剪时间在 `Work/audio-cut-notes.md`
-- 头像：公开照片，做了去背景处理
+- Audio: 11 original voice clips cut from two MP3 recordings of FengGe's remarks; the cut points are documented in `Work/audio-cut-notes.md`.
+- Character image: a public photograph with the background removed.
 
-## 第三方代码
+## Third-party code
 
-初版来自 [yuhanfu513-ops/FengGe-Desktop-Pet](https://github.com/yuhanfu513-ops/FengGe-Desktop-Pet)。交互和播放设计参考了 [SunPet](https://github.com/Ganzhe2028/SunPet)，其 MIT 许可全文见 [licenses/SunPet-MIT.txt](licenses/SunPet-MIT.txt)。
+The original version came from [yuhanfu513-ops/FengGe-Desktop-Pet](https://github.com/yuhanfu513-ops/FengGe-Desktop-Pet). The interaction and playback design was inspired by [SunPet](https://github.com/Ganzhe2028/SunPet); the full text of its MIT license is in [licenses/SunPet-MIT.txt](licenses/SunPet-MIT.txt).

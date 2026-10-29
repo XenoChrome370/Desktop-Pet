@@ -1,32 +1,34 @@
 # AGENTS.md
 
-给在这个仓库里干活的 AI。人看的在 [README.md](README.md)，技术细节在 [TECHNICAL.md](TECHNICAL.md)，素材权利在 [NOTICE.md](NOTICE.md)。
+For AI agents working in this repository. Humans should read [README.md](README.md); technical details are in [TECHNICAL.md](TECHNICAL.md); asset rights are in [NOTICE.md](NOTICE.md).
 
-## 构建与验证
+## Build and verification
 
-- `./build.sh` 编译并跑 `--self-test`，最后一行必须是 `PASS`。没 PASS 就是没改完。
-- `./install.sh --build` 装进 /Applications 并启动；`./build.sh --package` 产出 dist/ 下的 zip、dmg、sha256。
-- 只支持 Apple Silicon + macOS 14，构建脚本里写死 arm64，不要为 Intel 改。
-- 诊断入口：`--self-test`、`--dump-state`、`--trace`、`--bridge-test`
+- `./build.sh` compiles and runs `--self-test`. The last line must be `PASS`; if it is not, the work is not finished.
+- `./install.sh --build` installs into /Applications and launches. `./build.sh --package` produces zip, dmg and sha256 files under `dist/`.
+- Only Apple Silicon + macOS 14 is supported. The build script hard-codes arm64; do not change it for Intel.
+- `GoodThingPet.xcodeproj` is the native Xcode project. It must build with the shared `GoodThingPet` scheme and use the same bundle identifier, resources and Info.plist settings as `build.sh`.
+- Diagnostic entry points: `--self-test`, `--dump-state`, `--trace`, `--bridge-test`.
 
-## 不能破的约束
+## Constraints that must not be broken
 
-- `Sources/Bridge.swift` 在 SunPet / ShaolanPet / FengGe-Desktop-Pet 三个仓库里必须逐字节相同。改一处要三处同步，验法：`md5 -q Sources/Bridge.swift` 三份一致。
-- `LICENSE` 只放标准 MIT 全文。素材权利写在 `NOTICE.md`，第三方代码许可放 `licenses/`。往 LICENSE 末尾追加例外会让 GitHub 判成 `NOASSERTION`，按 MIT 筛选就搜不到；验法 `gh api repos/Ganzhe2028/FengGe-Desktop-Pet --jq .license.spdx_id` 要返回 `MIT`。
-- README 是给刷到视频的普通人看的落地页，只放四块：四张脸互链、装三步、一句自己的效果、立场。技术长文一律进 TECHNICAL.md。
-- README 顶部四张脸是四个独立 App 的互链，不是同一个 App 的皮肤。这句说明不能删。
-- 二进制不进仓库，安装包走 Releases。
+- `Sources/Bridge.swift` must be **byte-identical** across the SunPet / ShaolanPet / FengGe-Desktop-Pet repositories. Change one, change all three. Verify with `md5 -q Sources/Bridge.swift` on all three copies.
+- Because of the rule above, do not translate or reformat `Sources/Bridge.swift` in this repository alone. Its Chinese display names and comments are part of the shared file.
+- `LICENSE` contains only the standard MIT text. Asset rights live in `NOTICE.md`; third-party code licenses live in `licenses/`. Appending exceptions to the end of `LICENSE` makes GitHub report `NOASSERTION`, so the repository no longer appears in MIT-filtered searches. Verify with `gh api repos/XenoChrome370/Desktop-Pet --jq .license.spdx_id`, which must return `MIT`.
+- README is a landing page for ordinary viewers. Keep it focused on the four interlinked faces, the install steps, a short personal note, and the project's stance. Long technical write-ups belong in TECHNICAL.md.
+- The four faces at the top of README are links to four **independent apps**, not four skins of one app. Do not remove that clarification.
+- Binaries do not go into the repository; installers go through Releases.
 
-## 发布
+## Release
 
-打 `v*` tag 会触发 `.github/workflows/release.yml` 自动构建并上传 `GoodThingPet-<版本>.dmg/.zip/.sha256`。三个仓库的资产命名保持一致，README 写死「下载最新的 `.dmg`」。
+Pushing a `v*` tag triggers `.github/workflows/release.yml`, which builds and uploads `GoodThingPet-<version>.dmg/.zip/.sha256`. Keep asset naming consistent across the three repositories; README must tell users to download the latest `.dmg`.
 
-## 联动
+## Companion protocol
 
-三个桌宠靠 `DistributedNotificationCenter` 互相接话，`hop` / `root` 两个字段防环。加角色先读 TECHNICAL.md 的《加第四个人》，同时确认 peers、hop 上限、root 条件三处。`--self-test` 不覆盖联动，别靠 PASS 宣布通了。第四个 [JellyPet](https://github.com/aurelius358/JellyPet) 是别人做的形状挂件，没有语音，不在这套协议里。
+The three pets talk to each other through `DistributedNotificationCenter`, using the `hop` and `root` fields to prevent loops. Before adding a character, read "Adding a fourth character" in TECHNICAL.md, and check all three places: `peers`, the hop cap, and the `root` condition. `--self-test` does not cover the companion protocol; do not use a `PASS` result to claim the link works. The fourth project, [JellyPet](https://github.com/aurelius358/JellyPet), is a shape accessory by another author with no voice, and is not part of this protocol.
 
-## 这个仓库
+## This repository
 
-- app：`好事桌宠.app`，bundle id `local.goodthing.desktop-pet`
-- 四步链位置：峰哥，只在薄肌起的链里接太对了
-- peers：`[.sunpet]`
+- App: `GoodThingPet.app`, bundle id `local.goodthing.desktop-pet`
+- Position in the four-step chain: FengGe, which replies only inside a chain started by Shaolan
+- peers: `[.sunpet]`
