@@ -35,15 +35,16 @@ Shaolan, SunPet and GoodThing reply to each other when they run at the same time
 
 I'm William Yao ([@XenoChrome370](https://github.com/XenoChrome370)). This is my personal fork of [FengGe-Desktop-Pet](https://github.com/Ganzhe2028/FengGe-Desktop-Pet), kept as a working macOS app that I can build and modify locally.
 
-Compared with upstream, this copy has English documentation and in-app text, a checked-in native Xcode project alongside the shell build, and a fix for the missing `LICENSE-SunPet` resource that previously stopped `build.sh` on a clean checkout. The pet's behavior is unchanged: the same 11 clips, the same interaction model, and the same companion protocol.
+Compared with upstream, this copy has English documentation and in-app text, a checked-in native Xcode project alongside the shell build, a Liquid Glass caption on macOS 26 and newer, a changeable menu bar picture, and a fix for the missing `LICENSE-SunPet` resource that previously stopped `build.sh` on a clean checkout. The pet's behavior is otherwise unchanged: the same 11 clips, the same interaction model, and the same companion protocol.
 
 ## What you get
 
-- **A transparent floating character.** It sits in front of normal windows and never takes keyboard focus. There is no Dock icon; a `GoodThing` item appears in the menu bar instead.
+- **A transparent floating character.** It sits in front of normal windows and never takes keyboard focus. There is no Dock icon; an item showing the pet's face appears in the menu bar instead.
 - **11 original voice clips.** Click the character to play one at random. A full cycle never repeats a clip, and the first clip of the next cycle will not immediately repeat the previous one.
 - **Click again to interrupt.** The current clip stops and the next one starts; two clips never play over each other.
-- **Captions and a talking animation.** The character compresses vertically and springs back while a caption shows the line being spoken. The animation is disabled automatically when macOS Reduce Motion is on.
+- **Captions and a talking animation.** The character compresses vertically and springs back while a caption shows the line being spoken. On macOS 26 and newer the caption is Liquid Glass. The animation is disabled automatically when macOS Reduce Motion is on.
 - **Drag to reposition.** Right-click the character, or click the menu bar item, to choose a specific clip, stop playback, adjust volume, change the character size, move the pet back to the bottom-right corner, or quit. Position, volume, size, playback mode and excluded clips are remembered.
+- **A menu bar picture you can change.** The menu bar item shows the pet's face by default; **Menu bar picture** in the settings menu switches to a text label or to any image file you choose.
 - **A rotation playlist.** Uncheck any of the 11 clips in the menu to keep it out of random playback; at least one clip always remains.
 - **Companion mode.** When SunPet or Shaolan is also running, GoodThing answers within a chain. See [companion chain](#companion-chain).
 
@@ -61,7 +62,7 @@ If you still cannot install, want to build it yourself, or want to swap the face
 
 ## Build from source
 
-Requires macOS 14+, an Apple Silicon Mac, and the Xcode Command Line Tools (`xcode-select --install`).
+Requires macOS 14+, an Apple Silicon Mac, and the Xcode Command Line Tools. Compiling the Liquid Glass caption requires the macOS 26 SDK (Xcode 26 or newer); the built app itself still runs on macOS 14 and newer.
 
 ```sh
 ./build.sh          # compile, then run the built-in self-test; the last line must be PASS

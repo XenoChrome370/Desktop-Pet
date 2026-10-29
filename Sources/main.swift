@@ -1,5 +1,6 @@
 import AppKit
 import AVFoundation
+import UniformTypeIdentifiers
 
 // Interaction and playback design adapted from SunPet (MIT); see LICENSE-SunPet.
 struct Clip: Codable {
@@ -39,10 +40,103 @@ final class PassiveLabel: NSTextField {
     override func hitTest(_ point: NSPoint) -> NSView? { nil }
 }
 
+/// Caption bubble shown above the pet.
+///
+/// On macOS 26 and newer the background is a real Liquid Glass effect
+/// (`NSGlassEffectView`); older systems keep the previous translucent black
+/// rounded rectangle. The label is centered in both axes by sizing it to the
+/// text and centering that frame inside the bubble. NSTextField draws wrapped
+/// text from the top of its cell, which is why the old caption sat visibly
+/// high in its 34pt box.
+final class CaptionBubble: NSView {
+    let label = PassiveLabel(labelWithString: "")
+    private var glass: NSView?
+    private let minimumRadius: CGFloat = 11
+
+    var stringValue: String {
+        get { label.stringValue }
+        set {
+            label.stringValue = newValue
+            needsLayout = true
+            superview?.needsLayout = true
+        }
+    }
+
+    /// Width needed to show the caption on one line, capped at `maximum`.
+    /// A short Chinese caption should not stretch into a full-width bar.
+    func fittingWidth(for maximum: CGFloat) -> CGFloat {
+        let size = label.cell?.cellSize(forBounds: NSRect(x: 0, y: 0, width: 10_000, height: 100)) ?? .zero
+        return min(maximum, max(72, ceil(size.width) + 30))
+    }
+
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        wantsLayer = true
+        label.font = .systemFont(ofSize: 13, weight: .medium)
+        label.textColor = .white
+        label.alignment = .center
+        label.maximumNumberOfLines = 1
+        label.lineBreakMode = .byTruncatingTail
+        label.usesSingleLineMode = true
+        label.cell?.wraps = false
+        label.cell?.isScrollable = false
+        // A soft shadow keeps the white text legible on light glass.
+        let shadow = NSShadow()
+        shadow.shadowColor = NSColor.black.withAlphaComponent(0.55)
+        shadow.shadowBlurRadius = 2
+        shadow.shadowOffset = NSSize(width: 0, height: -1)
+        label.shadow = shadow
+
+        if #available(macOS 26.0, *) {
+            let effect = NSGlassEffectView()
+            effect.style = .regular
+            effect.cornerRadius = minimumRadius
+            // White text needs a dark tint to stay readable over light wallpapers.
+            effect.tintColor = NSColor.black.withAlphaComponent(0.48)
+            // Arbitrary subviews have no guaranteed z-order over the glass, so the
+            // label must be the glass content view rather than a sibling.
+            effect.contentView = label
+            addSubview(effect)
+            glass = effect
+        } else {
+            layer?.backgroundColor = NSColor.black.withAlphaComponent(0.76).cgColor
+            layer?.cornerRadius = minimumRadius
+            addSubview(label)
+        }
+        isHidden = true
+    }
+    required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
+
+    /// Clicks on the caption must reach the pet below it.
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }
+
+    override func layout() {
+        super.layout()
+        let radius = max(minimumRadius, bounds.height / 2)
+        if #available(macOS 26.0, *), let effect = glass as? NSGlassEffectView {
+            effect.frame = bounds
+            effect.cornerRadius = radius
+        } else {
+            layer?.cornerRadius = radius
+        }
+
+        let horizontalInset: CGFloat = 12
+        let verticalInset: CGFloat = 5
+        let content = NSRect(x: horizontalInset, y: verticalInset,
+                             width: max(1, bounds.width - horizontalInset * 2),
+                             height: max(1, bounds.height - verticalInset * 2))
+        let needed = label.cell?.cellSize(forBounds: NSRect(x: 0, y: 0, width: content.width, height: 10_000)) ?? .zero
+        let textHeight = min(ceil(max(needed.height, 1)), content.height)
+        label.frame = NSRect(x: content.minX,
+                             y: content.minY + (content.height - textHeight) / 2,
+                             width: content.width, height: textHeight)
+    }
+}
+
 final class PetView: NSView {
     weak var owner: AppDelegate?
     let face = PassiveImage()
-    let caption = PassiveLabel(labelWithString: "")
+    let caption = CaptionBubble()
     var initialMouse = NSPoint.zero
     var initialWindow = NSPoint.zero
     var dragged = false
@@ -56,15 +150,6 @@ final class PetView: NSView {
         face.imageScaling = .scaleProportionallyUpOrDown
         face.wantsLayer = true
         addSubview(face)
-        caption.alignment = .center
-        caption.textColor = .white
-        caption.font = .systemFont(ofSize: 13, weight: .medium)
-        caption.maximumNumberOfLines = 2
-        caption.lineBreakMode = .byTruncatingTail
-        caption.wantsLayer = true
-        caption.layer?.backgroundColor = NSColor.black.withAlphaComponent(0.76).cgColor
-        caption.layer?.cornerRadius = 9
-        caption.isHidden = true
         addSubview(caption)
         toolTip = "Click to play a random clip · Drag to move · Right-click for settings"
         setAccessibilityElement(true)
@@ -75,7 +160,10 @@ final class PetView: NSView {
     override func layout() {
         super.layout()
         face.frame = NSRect(x: 8, y: 8, width: bounds.width - 16, height: bounds.height - 52)
-        caption.frame = NSRect(x: 3, y: bounds.height - 38, width: bounds.width - 6, height: 34)
+        let maximumCaptionWidth = max(72, bounds.width - 12)
+        let captionWidth = caption.fittingWidth(for: maximumCaptionWidth)
+        caption.frame = NSRect(x: (bounds.width - captionWidth) / 2, y: bounds.height - 37,
+                               width: captionWidth, height: 32)
     }
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
     override func mouseDown(with event: NSEvent) {
@@ -132,6 +220,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, AVAudioPlayerDelegate 
     var volume: Float = 0.65
     var size: CGFloat = 260
     var imageRatio: CGFloat = 1
+    /// The pet face, kept so it can also be drawn in the menu bar.
+    var faceImage: NSImage?
+    /// Menu bar icon: "face" (default), "text", or "custom".
+    var statusIconMode = "face"
+    var statusIconPath: String?
     // Companion chain: Shaolan starts → SunPet → FengGe → SunPet.
     // peers is "who I listen to". FengGe listens only to SunPet, and only joins a
     // chain started by Shaolan; see startBridge.
@@ -188,6 +281,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, AVAudioPlayerDelegate 
             alert.runModal(); NSApp.terminate(nil); return
         }
         imageRatio = image.size.height / image.size.width
+        faceImage = image
+        if let mode = defaults.string(forKey: "statusIconMode"), ["face", "text", "custom"].contains(mode) {
+            statusIconMode = mode
+        }
+        statusIconPath = defaults.string(forKey: "statusIconPath")
         if defaults.object(forKey: "volume") != nil { volume = min(max(defaults.float(forKey: "volume"), 0), 1) }
         if defaults.object(forKey: "size") != nil { size = min(max(CGFloat(defaults.double(forKey: "size")), 160), 400) }
         if defaults.object(forKey: "randomMode") != nil { randomMode = defaults.bool(forKey: "randomMode") }
@@ -218,14 +316,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, AVAudioPlayerDelegate 
         restorePosition()
         panel.orderFrontRegardless()
         status = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        status.button?.title = "GoodThing"
-        status.button?.toolTip = "GoodThing Pet · Click to open settings"
         status.button?.target = self; status.button?.action = #selector(openStatusMenu)
+        applyStatusIcon()
         updateToolTip()
         // All 11 clips are pure reactions and can follow anyone, so no filtering is needed.
         companionPool = clips
         preloadCompanionClips()
-        if selfTest { runSelfTest() } else if bridgeTest { startBridge(); runBridgeTest() } else { startBridge(); showCaption("Click me for a line · Right-click for settings", seconds: 5) }
+        if selfTest { runSelfTest() } else if bridgeTest { startBridge(); runBridgeTest() } else { startBridge(); showCaption("Click me · Right-click", seconds: 5) }
     }
 
     // MARK: - Companion link
@@ -255,8 +352,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, AVAudioPlayerDelegate 
             guard from == .sunpet, root == .shaolan else { return }
             self.scheduleCompanion(after: duration, hop: hop, root: root)
         }
+        bridge.onPresenceChange = { [weak self] present in
+            guard let self else { return }
+            self.bridgeStatus = present ? "Link: listening to SunPet" : "Link: SunPet not running"
+        }
         bridge.start()
-        bridgeStatus = "Link: listening to SunPet"
+        bridgeStatus = bridge.peerIsRunning ? "Link: listening to SunPet" : "Link: SunPet not running"
     }
 
     /// Schedule one reply after the previous hop finishes speaking.
@@ -349,8 +450,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, AVAudioPlayerDelegate 
         placeAtCorner()
     }
     func placeAtCorner() {
-        guard let screen = NSScreen.main ?? NSScreen.screens.first else { return }
+        guard let screen = panel.screen ?? NSScreen.main ?? NSScreen.screens.first else { return }
         panel.setFrameOrigin(NSPoint(x: screen.visibleFrame.maxX - panelSize.width - 32, y: screen.visibleFrame.minY + 24))
+    }
+    /// After a size change the window can hang off the screen edge. Pull it back
+    /// so the pet stays clickable instead of growing out of the display.
+    func keepOnScreen() {
+        guard let screen = panel.screen ?? NSScreen.main ?? NSScreen.screens.first else { return }
+        let visible = screen.visibleFrame
+        var origin = panel.frame.origin
+        origin.x = min(max(origin.x, visible.minX), max(visible.minX, visible.maxX - panelSize.width))
+        origin.y = min(max(origin.y, visible.minY), max(visible.minY, visible.maxY - panelSize.height))
+        if origin != panel.frame.origin { panel.setFrameOrigin(origin) }
     }
     func savePosition() {
         guard !selfTest, let panel else { return }
@@ -409,6 +520,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, AVAudioPlayerDelegate 
             option.state = Int(size) == value ? .on : .off; sizes.addItem(option)
         }
         sizeItem.submenu = sizes; menu.addItem(sizeItem)
+        let iconItem = item("Menu bar picture", nil), icons = NSMenu()
+        let faceOption = item("Pet picture", #selector(statusIconFace))
+        faceOption.state = statusIconMode == "face" ? .on : .off
+        let textOption = item("Text label", #selector(statusIconText))
+        textOption.state = statusIconMode == "text" ? .on : .off
+        let chooseOption = item("Choose picture…", #selector(chooseStatusIcon))
+        chooseOption.state = statusIconMode == "custom" ? .on : .off
+        icons.addItem(faceOption); icons.addItem(textOption)
+        icons.addItem(.separator()); icons.addItem(chooseOption)
+        iconItem.submenu = icons; menu.addItem(iconItem)
         menu.addItem(item("Move back to bottom-right", #selector(resetPosition)))
         menu.addItem(.separator())
         menu.addItem(item("Quit pet", #selector(quit)))
@@ -462,6 +583,145 @@ final class AppDelegate: NSObject, NSApplicationDelegate, AVAudioPlayerDelegate 
     func updateToolTip() {
         let text = randomMode ? "Click to play a random clip · Drag to move · Right-click for settings" : "Click to replay the pinned clip · Drag to move · Right-click for settings"
         pet?.toolTip = text
+    }
+
+    // MARK: - Menu bar picture
+
+    var statusIconDirectory: URL {
+        let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
+            ?? URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
+        return base.appendingPathComponent("GoodThingPet", isDirectory: true)
+    }
+
+    /// Scale a picture to menu bar size, keep its aspect ratio, and clip it to a
+    /// small rounded rectangle so custom pictures look deliberate in the bar.
+    /// The icon is rendered into a real bitmap: an NSImage drawing handler has no
+    /// bitmap representation until drawn, which some status bar versions ignore.
+    /// `headCrop` narrows the pet portrait to the head, which is all that is
+    /// recognizable at 18pt.
+    func menuBarIcon(from source: NSImage, headCrop: Bool = false) -> NSImage? {
+        guard source.size.width > 0, source.size.height > 0 else { return nil }
+        let box = NSSize(width: 20, height: 18)
+        let sourceRect = headCrop
+            ? NSRect(x: source.size.width * 0.22, y: source.size.height * 0.60,
+                     width: source.size.width * 0.56, height: source.size.height * 0.40)
+            : NSRect(origin: .zero, size: source.size)
+        let scale: CGFloat = 2
+        guard let bitmap = NSBitmapImageRep(bitmapDataPlanes: nil,
+                                            pixelsWide: Int(box.width * scale),
+                                            pixelsHigh: Int(box.height * scale),
+                                            bitsPerSample: 8, samplesPerPixel: 4,
+                                            hasAlpha: true, isPlanar: false,
+                                            colorSpaceName: .deviceRGB,
+                                            bytesPerRow: 0, bitsPerPixel: 0) else { return nil }
+        // The rep must report the point size before the context is created, otherwise
+        // the drawing is done in pixel coordinates and the icon lands in a corner.
+        bitmap.size = box
+        guard let context = NSGraphicsContext(bitmapImageRep: bitmap) else { return nil }
+        NSGraphicsContext.saveGraphicsState()
+        NSGraphicsContext.current = context
+        context.imageInterpolation = .high
+        NSBezierPath(roundedRect: NSRect(origin: .zero, size: box).insetBy(dx: 0.5, dy: 0.5),
+                     xRadius: 4, yRadius: 4).addClip()
+        let fit = min(box.width / sourceRect.width, box.height / sourceRect.height)
+        let drawSize = NSSize(width: sourceRect.width * fit, height: sourceRect.height * fit)
+        let target = NSRect(x: (box.width - drawSize.width) / 2,
+                            y: (box.height - drawSize.height) / 2,
+                            width: drawSize.width, height: drawSize.height)
+        source.draw(in: target, from: sourceRect, operation: .sourceOver, fraction: 1)
+        NSGraphicsContext.restoreGraphicsState()
+        let icon = NSImage(size: box)
+        icon.addRepresentation(bitmap)
+        icon.isTemplate = false
+        return icon
+    }
+
+    func applyStatusIcon() {
+        guard let button = status.button else { return }
+        var mode = statusIconMode
+        if mode == "custom" {
+            if let path = statusIconPath, let image = NSImage(contentsOfFile: path), let icon = menuBarIcon(from: image) {
+                button.imagePosition = .imageOnly
+                button.imageScaling = .scaleProportionallyDown
+                button.image = icon
+                button.title = ""
+            } else {
+                // The saved picture was deleted or unreadable; fall back to the pet face.
+                mode = "face"
+            }
+        }
+        if mode == "face" {
+            if let face = faceImage, let icon = menuBarIcon(from: face, headCrop: true) {
+                button.imagePosition = .imageOnly
+                button.imageScaling = .scaleProportionallyDown
+                button.image = icon
+                button.title = ""
+            } else {
+                button.image = nil
+                button.imagePosition = .noImage
+                button.title = "GoodThing"
+            }
+        } else if mode == "text" {
+            button.image = nil
+            button.imagePosition = .noImage
+            button.title = "GoodThing"
+        }
+        if mode != statusIconMode {
+            statusIconMode = mode
+            defaults.set(mode, forKey: "statusIconMode")
+            if mode != "custom" {
+                statusIconPath = nil
+                defaults.removeObject(forKey: "statusIconPath")
+            }
+        }
+        button.setAccessibilityLabel("GoodThing Pet")
+        button.toolTip = "GoodThing Pet · Click to open settings"
+    }
+
+    @objc func statusIconFace() {
+        statusIconMode = "face"
+        defaults.set(statusIconMode, forKey: "statusIconMode")
+        applyStatusIcon()
+    }
+
+    @objc func statusIconText() {
+        statusIconMode = "text"
+        defaults.set(statusIconMode, forKey: "statusIconMode")
+        applyStatusIcon()
+    }
+
+    @objc func chooseStatusIcon() {
+        let picker = NSOpenPanel()
+        picker.title = "Choose a menu bar picture"
+        picker.message = "The picture is copied into the app's support folder and scaled to fit the menu bar."
+        picker.allowsMultipleSelection = false
+        picker.canChooseDirectories = false
+        picker.canChooseFiles = true
+        picker.allowedContentTypes = [.image]
+        NSApp.activate(ignoringOtherApps: true)
+        guard picker.runModal() == .OK, let url = picker.url else { return }
+        guard let image = NSImage(contentsOf: url),
+              let tiff = image.tiffRepresentation,
+              let bitmap = NSBitmapImageRep(data: tiff),
+              let png = bitmap.representation(using: .png, properties: [:]) else {
+            showCaption("That picture could not be read", seconds: 3)
+            return
+        }
+        let folder = statusIconDirectory
+        let destination = folder.appendingPathComponent("menu-bar.png")
+        do {
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            try png.write(to: destination)
+        } catch {
+            showCaption("Could not save that picture", seconds: 3)
+            return
+        }
+        statusIconPath = destination.path
+        statusIconMode = "custom"
+        defaults.set(destination.path, forKey: "statusIconPath")
+        defaults.set(statusIconMode, forKey: "statusIconMode")
+        applyStatusIcon()
+        showCaption("Menu bar picture updated", seconds: 2)
     }
     @objc func modeRandom() { setMode(random: true) }
     @objc func modeFixed() { setMode(random: false) }
@@ -526,6 +786,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, AVAudioPlayerDelegate 
     }
     @objc func setSize(_ sender: NSMenuItem) {
         size = CGFloat(sender.tag); panel.setContentSize(panelSize)
+        pet.needsLayout = true
+        keepOnScreen()
         defaults.set(Double(size), forKey: "size"); savePosition()
     }
     @objc func quit() { NSApp.terminate(nil) }
@@ -598,6 +860,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, AVAudioPlayerDelegate 
         // close the menu on click, so several could not be toggled in a row.
         let filterBoxes = makeMenu().items.first(where: { $0.title == "Rotation playlist" })?.submenu?.items.compactMap { $0.view as? NSButton } ?? []
         check(filterBoxes.count == clips.count && filterBoxes.allSatisfy { !$0.title.isEmpty && $0.action != nil }, "rotation list uses real checkboxes")
+        check(faceImage != nil && menuBarIcon(from: faceImage!, headCrop: true)?.representations.contains { $0.pixelsWide > 0 } == true, "menu bar picture renders")
+        let iconOptions = makeMenu().items.first(where: { $0.title == "Menu bar picture" })?.submenu?.items.filter { !$0.isSeparatorItem } ?? []
+        check(iconOptions.count == 3, "menu bar picture offers face, text and custom")
+        showCaption(clips[0].label, seconds: 3)
+        pet.layoutSubtreeIfNeeded()
+        let bubble = pet.caption
+        bubble.layoutSubtreeIfNeeded()
+        check(!bubble.isHidden && abs(bubble.label.frame.midY - bubble.bounds.midY) < 1.0, "caption text is vertically centered")
+        check(bubble.hitTest(NSPoint(x: bubble.bounds.midX, y: bubble.bounds.midY)) == nil, "caption does not block pet clicks")
         stopPlayback()
         check(player?.isPlaying == false && !pet.speaking && pet.caption.isHidden, "stop clears audio, animation and caption")
         if let i = CommandLine.arguments.firstIndex(of: "--preview"), i + 1 < CommandLine.arguments.count {

@@ -12,11 +12,12 @@ If you want a favorite character and its voice on your desktop for quick interac
 
 ## Main features
 
-- **Transparent floating character.** The character is drawn in front of normal windows, without a Dock icon. A `GoodThing` item appears in the menu bar.
+- **Transparent floating character.** The character is drawn in front of normal windows, without a Dock icon. A menu bar item shows the character's face.
 - **Random playback.** Clicking the character plays one of 11 clips. No clip repeats within a cycle, and the first clip of the next cycle does not immediately repeat the previous clip.
 - **Click to switch.** Clicking again stops the current clip and starts the next one; audio never overlaps.
-- **Talking animation and captions.** While a clip plays, the character compresses vertically and springs back without changing width, and a caption shows the current line. When macOS Reduce Motion is enabled, the character stays still.
-- **Dragging and settings.** Drag the character to move it. Right-click it, or click `GoodThing` in the menu bar, to choose a specific clip, stop playback, adjust volume and character size, move the pet back to the bottom-right corner, or quit. Position, volume and size are persisted.
+- **Talking animation and captions.** While a clip plays, the character compresses vertically and springs back without changing width, and a caption shows the current line. On macOS 26 and newer the caption is drawn in Liquid Glass; older systems use a translucent rounded bubble. When macOS Reduce Motion is enabled, the character stays still.
+- **Dragging and settings.** Drag the character to move it. Right-click it, or click the menu bar item, to choose a specific clip, stop playback, adjust volume and character size, move the pet back to the bottom-right corner, or quit. Position, volume and size are persisted.
+- **Changeable menu bar picture.** The menu bar item shows the pet's face by default. **Menu bar picture** in the settings menu switches it back to text, or lets you choose any image file; the picture is copied into the app's support folder and scaled to menu bar size.
 - **Companion mode.** If [SunPet](https://github.com/Ganzhe2028/SunPet) or [ShaolanPet](https://github.com/Ganzhe2028/ShaolanPet) is running on the same desktop, GoodThing replies after a qualifying line from another pet, forming a short comedy exchange. See [The three pets](#the-three-pets).
 
 ## Installation
@@ -35,7 +36,7 @@ You can also download the zip, but **extract it by double-clicking in Finder**. 
 
 ### Option 2: Build from source
 
-Requires `swiftc` from the Xcode Command Line Tools; install with `xcode-select --install`. From the project root:
+Requires `swiftc` from the Xcode Command Line Tools; install with `xcode-select --install`. The Liquid Glass caption uses `NSGlassEffectView`, so compiling needs the macOS 26 SDK (Xcode 26 or newer Command Line Tools). The resulting app still runs on macOS 14 and newer; older systems use the fallback caption. From the project root:
 
 ```sh
 ./build.sh          # compile and run the self-test; prints PASS on success
@@ -70,7 +71,8 @@ The Xcode build is an alternative to `build.sh`, not a replacement. `build.sh` i
 | Single-click the character | Play a random clip, show its caption and start the vertical compression animation |
 | Click again during playback | Stop the current clip and play the next one |
 | Drag the character | Move the floating window; the position is remembered after quitting |
-| Right-click the character or click `GoodThing` in the menu bar | Open the settings menu |
+| Right-click the character or click the menu bar item | Open the settings menu |
+| Menu → **Menu bar picture** | Show the pet picture, switch to a text label, or choose a custom image |
 | Menu → **Choose a clip** | Play the selected clip immediately |
 | Menu → **Stop playback** | Stop the audio, hide the caption and end the animation |
 | Menu → **Quit pet** | Quit the app |
@@ -97,7 +99,7 @@ There is no direct channel between FengGe and Shaolan. Once SunPet finishes the 
 
 When [SunPet](https://github.com/Ganzhe2028/SunPet) (the `SunPet` menu bar item) or [ShaolanPet](https://github.com/Ganzhe2028/ShaolanPet) is also running, GoodThing joins in automatically: after you click FengGe and the line finishes, the other pet answers with a short reply under one second, forming a comedy exchange.
 
-- **Both apps must be running.** No pairing, ports or network are involved. If SunPet quits, companion mode stops automatically; the `GoodThing` menu item changes from `Link: listening to SunPet` to a self-only state.
+- **Both apps must be running.** No pairing, ports or network are involved. If SunPet quits, companion mode stops automatically; the menu item changes from `Link: listening to SunPet` to `Link: SunPet not running`.
 - **Overlapping handoff.** The other pet starts roughly 0.3 seconds before the current line ends. This is not meant to interrupt; waiting until the line fully ends leaves an audible gap that sounds like a glitch. The second hop (SunPet replying after FengGe) is tightened to 0.2 seconds so the four steps do not drag.
 - **FengGe replies only in a chain started by Shaolan.** If you click FengGe yourself, only SunPet answers once and stops; FengGe is not brought back for another line. If SunPet quits without notice, only this exchange is lost; normal FengGe playback is unaffected.
 
@@ -107,10 +109,10 @@ Implementation: the three apps send a local notification through `DistributedNot
 
 | Symptom | Cause and fix |
 | --- | --- |
-| Double-clicking the app does nothing and no Dock icon appears | An instance is already running. Only one copy of the app may run; a second launch exits silently. Look for the `GoodThing` item at the right end of the menu bar. |
+| Double-clicking the app does nothing and no Dock icon appears | An instance is already running. Only one copy of the app may run; a second launch exits silently. Look for the pet-face item (or the `GoodThing` text item) at the right end of the menu bar. |
 | "App is damaged and should be moved to the Trash" or "unidentified developer" | The app is ad-hoc signed and not notarized, so Gatekeeper blocks it. Right-click the app and choose **Open**, or go to **System Settings › Privacy & Security** and click **Open Anyway**. If that fails, run `xattr -dr com.apple.quarantine /Applications/GoodThingPet.app` in Terminal. |
 | Extraction reports `write error (disk full?)` and files are missing | A known problem with terminal `unzip` and non-ASCII filenames; the disk is not actually full. Extract by double-clicking in Finder, or use `ditto -x -k archive.zip destination`. |
-| No sound when clicking the character | Check **Volume** in the `GoodThing` menu and confirm the system output device and volume. |
+| No sound when clicking the character | Check **Volume** in the settings menu and confirm the system output device and volume. |
 | The character was dragged off-screen, or is lost after changing displays | Menu → **Move back to bottom-right**. |
 | The old version still opens after reinstalling | The old process is still running. `./install.sh` quits it before installing. |
 
@@ -134,7 +136,7 @@ Volume, character size and the window position after dragging are stored in macO
 
 | Path | Purpose |
 | --- | --- |
-| `Sources/main.swift` | Transparent window, mouse handling, random playback, animation, menus, settings and self-test |
+| `Sources/main.swift` | Transparent window, mouse handling, random playback, animation, menus, Liquid Glass caption, menu bar picture and self-test |
 | `Sources/Bridge.swift` | Companion channel with SunPet: notification protocol and peer liveness checks. Identical in both repositories |
 | `Assets/face.png` | Character image with a transparent background |
 | `Assets/Clips/` | 11 cropped WAV audio files |
